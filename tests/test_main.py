@@ -6,7 +6,7 @@ import threading
 import typing
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, MutableSequence, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -1403,6 +1403,20 @@ def test_model_export_nested_list(exclude, expected, raises_match):
         original_exclude = deepcopy(exclude)
         assert m.model_dump(exclude=exclude) == expected
         assert exclude == original_exclude
+
+
+@pytest.mark.parametrize('field_type', [Sequence[int], MutableSequence[int]])
+def test_model_export_sequence_negative_indices(field_type) -> None:
+    """https://github.com/pydantic/pydantic/issues/14304"""
+
+    class Model(BaseModel):
+        values: field_type
+
+    m = Model(values=[1, 2, 3])
+
+    assert m.model_dump(exclude={'values': {-1}}) == {'values': [1, 2]}
+    assert m.model_dump(include={'values': {0, -1}}) == {'values': [1, 3]}
+    assert m.model_dump_json(exclude={'values': {-3}}) == '{"values":[2,3]}'
 
 
 @pytest.mark.parametrize(

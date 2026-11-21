@@ -478,6 +478,25 @@ def test_deque():
     assert s.to_python(deque([1, 2, 3]), mode='json', exclude={2}) == [1, 2]
     assert s.to_json(deque([1, 2, 3])) == b'[1,2,3]'
     assert s.to_json(deque([1, 2, 3]), exclude={2}) == b'[1,2]'
+    assert s.to_python(deque([1, 2, 3]), exclude={-1}) == deque([1, 2])
+    assert s.to_python(deque([1, 2, 3]), include={-3, -1}) == deque([1, 3])
+    assert s.to_json(deque([1, 2, 3]), exclude={-1}) == b'[1,2]'
+
+
+def test_wrap_index_negative_indices_unsized():
+    def serialize_iter(value, serializer):
+        return [serializer(item, index) for index, item in enumerate(value)]
+
+    s = SchemaSerializer(
+        core_schema.any_schema(
+            serialization=core_schema.wrap_serializer_function_ser_schema(
+                serialize_iter, schema=core_schema.any_schema()
+            )
+        )
+    )
+    # the length of the wrapped value isn't known, so negative indices can't be resolved
+    with pytest.raises(PydanticSerializationError, match='Negative indices cannot be used'):
+        s.to_python(iter([1, 2, 3]), exclude={-1})
 
 
 def test_custom_mapping():
